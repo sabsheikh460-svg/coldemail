@@ -123,7 +123,7 @@ if st.button("🚀 Generate Cold Email", type="primary", disabled=not target_url
     else:
         with st.spinner("🤖 AI Agents are analyzing and writing..."):
             try:
-                researcher, strategist, writer = create_agents(agency_services)
+                researcher, strategist, writer, _, _ = create_agents(agency_services)
                 
                 # Create tasks
                 task_analyze = Task(
