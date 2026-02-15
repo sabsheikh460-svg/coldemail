@@ -7,7 +7,7 @@ load_dotenv()
 
 
 llm = LLM(model="groq/llama-3.1-8b-instant",
-            api_key=os.getenv("GROQ_API_KEY"))
+            api_key=os.getenv("GEMINI_API_KEY"))
 
 
 search_tool = SerperDevTool()
@@ -55,7 +55,7 @@ enhancer_task = Task(
 crew = Crew(
     agents=[writer_agent, editor_agent, enhancer_agent],
     tasks= [writer_task, editor_task, enhancer_task],
-    verbose= True
+    verbose= True,
     memory=True 
 )
 
