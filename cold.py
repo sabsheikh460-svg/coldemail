@@ -170,7 +170,40 @@ if st.button("🚀 Generate Cold Email", type="primary", disabled=not target_url
                                 recipient_email, subject, email_result
                             )
                             if success:
+                                # Store in sent mailbox
+                                if 'sent_emails' not in st.session_state:
+                                    st.session_state['sent_emails'] = []
+                                
+                                email_record = {
+                                    'to': recipient_email,
+                                    'to_name': recipient_name,
+                                    'subject': subject,
+                                    'body': email_result,
+                                    'company_url': target_url,
+                                    'timestamp': st.session_state.get('_timestamp', 'Just now')
+                                }
+                                st.session_state['sent_emails'].insert(0, email_record)
+                                
+                                # Notification Agent
+                                st.balloons()
                                 st.success(f"✅ {message}")
+                                
+                                # Generate notification message
+                                notification_prompt = f"""You are a Notification Agent. Create a friendly, professional confirmation message.
+                                
+                                Email sent to: {recipient_name} at {recipient_email}
+                                Subject: {subject}
+                                Company: {target_url}
+                                
+                                Write a brief, celebratory notification confirming the email was sent successfully.
+                                Include next steps suggestion. Keep it under 3 sentences."""
+                                
+                                try:
+                                    notification = call_gemini(notification_prompt, api_key, model)
+                                    st.info(f"📢 **Notification:** {notification}")
+                                except:
+                                    st.info(f"📧 Email sent to **{recipient_name}** at **{recipient_email}** successfully!")
+                                
                             else:
                                 st.error(f"❌ Failed to send: {message}")
                 elif not recipient_email:
@@ -272,6 +305,32 @@ Our Response: {conv['our_reply']}
             
         except Exception as e:
             st.error(f"❌ Error: {str(e)}")
+
+# Mailbox Section - View Sent Emails
+st.header("📬 Mailbox - Sent Emails")
+
+if 'sent_emails' in st.session_state and st.session_state['sent_emails']:
+    for idx, email in enumerate(st.session_state['sent_emails']):
+        with st.expander(f"📧 To: {email['to_name']} ({email['to']}) - {email['subject'][:50]}..."):
+            st.markdown(f"**To:** {email['to_name']} <{email['to']}>")
+            st.markdown(f"**Company:** {email['company_url']}")
+            st.markdown(f"**Subject:** {email['subject']}")
+            st.markdown("**Body:**")
+            st.text_area(f"Email Content {idx}", value=email['body'], height=200, key=f"sent_email_{idx}")
+            
+            # Resend button
+            if st.button(f"🔄 Resend", key=f"resend_{idx}"):
+                with st.spinner("Resending..."):
+                    success, message = send_email(
+                        smtp_server, smtp_port, smtp_email, smtp_password,
+                        email['to'], email['subject'], email['body']
+                    )
+                    if success:
+                        st.success("✅ Resent successfully!")
+                    else:
+                        st.error(f"❌ Failed: {message}")
+else:
+    st.info("📭 No emails sent yet. Generate and send an email to see it here.")
 
 # Instructions
 with st.expander("📖 How to use"):
