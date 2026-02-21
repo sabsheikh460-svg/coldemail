@@ -1,8 +1,11 @@
 import os
 import json
+import smtplib
 import streamlit as st
 import requests
 from dotenv import load_dotenv
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 # Load environment variables
 load_dotenv()
@@ -11,35 +14,74 @@ load_dotenv()
 st.set_page_config(page_title="Cold Email Agent", page_icon="📧", layout="wide")
 
 st.title("📧 AI Cold Email Generator")
-st.markdown("Generate personalized cold emails using Gemini AI")
+st.markdown("Generate and send personalized cold emails using Gemini AI")
 
 # Sidebar for API configuration
 with st.sidebar:
-    st.header("⚙️ Configuration")
+    st.header("⚙️ Gemini API Configuration")
     api_key = st.text_input("Gemini API Key", value=os.getenv("GEMINI_API_KEY", ""), type="password")
     model = st.selectbox("Model", ["gemini-2.5-flash", "gemini-1.5-flash"])
     
-    st.header("🎯 Agency Services")
+    st.header("📧 Email Configuration (SMTP)")
+    st.markdown("For sending emails directly")
+    smtp_server = st.text_input("SMTP Server", value=os.getenv("SMTP_SERVER", "smtp.gmail.com"))
+    smtp_port = st.number_input("SMTP Port", value=int(os.getenv("SMTP_PORT", "587")))
+    smtp_email = st.text_input("Your Email", value=os.getenv("SMTP_EMAIL", ""), type="password")
+    smtp_password = st.text_input("Your Email Password/App Password", value=os.getenv("SMTP_PASSWORD", ""), type="password")
+    
+    st.header("🎯 Your Agency Services")
     agency_services = st.text_area(
-        "Services",
-        value="""1. Landing Page Optimization: Improve conversions without rebuilding the entire site.
-2. CRM Setup & Automation: Automate sales pipelines using HubSpot, Zoho, or custom AI.
-3. Website Speed & Core Web Vitals Optimization: Fix slow sites that lose Google rankings.""",
-        height=150
+        "List your services (one per line)",
+        value="""Landing Page Optimization: Improve conversions without rebuilding the entire site.
+CRM Setup & Automation: Automate sales pipelines using HubSpot, Zoho, or custom AI.
+Website Speed & Core Web Vitals Optimization: Fix slow sites that lose Google rankings.""",
+        height=150,
+        help="Enter each service on a new line. Format: Service Name: Description"
     )
 
 # Main input form
 st.header("🎯 Target Company")
-col1, col2 = st.columns(2)
+col1, col2, col3 = st.columns(3)
 with col1:
     target_url = st.text_input("Company Website URL", placeholder="https://example.com")
 with col2:
-    recipient_name = st.text_input("Recipient Name (optional)", placeholder="CEO")
+    recipient_name = st.text_input("Recipient Name", placeholder="CEO")
+with col3:
+    recipient_email = st.text_input("Recipient Email", placeholder="ceo@company.com")
 
 # Validate API key
 if not api_key:
     st.error("⚠️ Please enter your Gemini API Key in the sidebar")
     st.stop()
+
+# Email sending function
+def send_email(smtp_server, smtp_port, sender_email, sender_password, recipient_email, subject, body):
+    """Send email via SMTP"""
+    try:
+        msg = MIMEMultipart()
+        msg['From'] = sender_email
+        msg['To'] = recipient_email
+        msg['Subject'] = subject
+        msg.attach(MIMEText(body, 'plain'))
+        
+        server = smtplib.SMTP(smtp_server, smtp_port)
+        server.starttls()
+        server.login(sender_email, sender_password)
+        text = msg.as_string()
+        server.sendmail(sender_email, recipient_email, text)
+        server.quit()
+        return True, "Email sent successfully!"
+    except Exception as e:
+        return False, str(e)
+
+# Extract subject from email
+def extract_subject(email_text):
+    """Extract subject line from email text"""
+    lines = email_text.split('\n')
+    for line in lines:
+        if line.lower().startswith('subject:'):
+            return line.replace('Subject:', '').replace('subject:', '').strip()
+    return "Introduction - Agency Services"
 
 # Gemini API call function
 def call_gemini(prompt, api_key, model):
@@ -108,7 +150,7 @@ if st.button("🚀 Generate Cold Email", type="primary", disabled=not target_url
                 # Display result
                 st.success("✅ Cold email generated successfully!")
                 st.header("📨 Your Cold Email")
-                st.text_area("Copy this email:", value=email_result, height=300)
+                st.text_area("Copy this email:", value=email_result, height=300, key="email_display")
                 st.code(email_result, language="text")
                 
                 # Store for later use
@@ -116,6 +158,25 @@ if st.button("🚀 Generate Cold Email", type="primary", disabled=not target_url
                 st.session_state['company_url'] = target_url
                 st.session_state['research'] = research_result
                 st.session_state['strategy'] = strategy_result
+                st.session_state['recipient_email'] = recipient_email
+                
+                # Send Email Button
+                if recipient_email and smtp_email and smtp_password:
+                    if st.button("📤 Send Email Now", type="primary"):
+                        with st.spinner("Sending email..."):
+                            subject = extract_subject(email_result)
+                            success, message = send_email(
+                                smtp_server, smtp_port, smtp_email, smtp_password,
+                                recipient_email, subject, email_result
+                            )
+                            if success:
+                                st.success(f"✅ {message}")
+                            else:
+                                st.error(f"❌ Failed to send: {message}")
+                elif not recipient_email:
+                    st.info("💡 Enter recipient email to enable sending")
+                elif not smtp_email or not smtp_password:
+                    st.info("💡 Configure SMTP settings in sidebar to send emails")
                 
             except Exception as e:
                 error_msg = str(e)
@@ -215,10 +276,31 @@ Our Response: {conv['our_reply']}
 # Instructions
 with st.expander("📖 How to use"):
     st.markdown("""
+    ### Setup
     1. **Enter your Gemini API Key** in the sidebar
-    2. **Enter the target company URL** (e.g., https://openai.com)
-    3. **Optionally enter recipient name** (e.g., "CEO" or "John Smith")
-    4. **Click "Generate Cold Email"** to create the initial email
-    5. **When you get a reply**, paste it in "Auto-Reply Handler" and generate a response
-    6. **Use "Workflow Manager"** to get recommendations on next steps anytime
+    2. **Configure SMTP settings** (for Gmail: use App Password from Google Account settings)
+    3. **Enter your Agency Services** in the sidebar (one per line)
+    
+    ### Generate & Send Email
+    4. **Enter target company URL**, **recipient name**, and **recipient email**
+    5. **Click "Generate Cold Email"** to create the email
+    6. **Click "Send Email Now"** to send directly (or copy manually)
+    
+    ### Manage Replies
+    7. **When you get a reply**, paste it in "Auto-Reply Handler" and generate a response
+    8. **Use "Workflow Manager"** to get recommendations on next steps
+    """)
+    
+with st.expander("⚙️ SMTP Setup Guide"):
+    st.markdown("""
+    ### Gmail Setup
+    1. Go to Google Account → Security → 2-Step Verification → Enable
+    2. Go to Google Account → Security → App passwords
+    3. Select "Mail" and your device, click Generate
+    4. Copy the 16-character password and paste it in the sidebar
+    
+    ### Other Email Providers
+    - **Outlook**: smtp.office365.com, port 587
+    - **Yahoo**: smtp.mail.yahoo.com, port 587
+    - **Custom**: Check with your email provider
     """)
