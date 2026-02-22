@@ -10,17 +10,27 @@ from email.mime.multipart import MIMEMultipart
 # Load environment variables
 load_dotenv()
 
-# Initialize session state BEFORE anything else
-if 'smtp_config' not in st.session_state:
-    st.session_state['smtp_config'] = {
-        'server': os.getenv("SMTP_SERVER", "smtp.gmail.com"),
-        'port': int(os.getenv("SMTP_PORT", "587")),
-        'email': os.getenv("SMTP_EMAIL", ""),
-        'password': os.getenv("SMTP_PASSWORD", "")
-    }
-
-# Page config
+# Page config - MUST be first Streamlit command
 st.set_page_config(page_title="Cold Email Agent", page_icon="📧", layout="wide")
+
+# Initialize session state with defaults
+def init_session_state():
+    defaults = {
+        'smtp_config': {
+            'server': os.getenv("SMTP_SERVER", "smtp.gmail.com"),
+            'port': int(os.getenv("SMTP_PORT", "587")),
+            'email': os.getenv("SMTP_EMAIL", ""),
+            'password': os.getenv("SMTP_PASSWORD", "")
+        },
+        'generated_email': '',
+        'company_url': '',
+        'sent_emails': []
+    }
+    for key, value in defaults.items():
+        if key not in st.session_state:
+            st.session_state[key] = value
+
+init_session_state()
 
 st.title("📧 AI Cold Email Generator")
 st.markdown("Generate and send personalized cold emails using Gemini AI")
