@@ -24,20 +24,28 @@ with st.sidebar:
     
     st.header("📧 Email Configuration (SMTP)")
     st.markdown("For sending emails directly")
-    smtp_server = st.text_input("SMTP Server", value=os.getenv("SMTP_SERVER", "smtp.gmail.com"), help="For Gmail: smtp.gmail.com")
-    smtp_port = st.number_input("SMTP Port", value=int(os.getenv("SMTP_PORT", "587")), help="For Gmail: 587")
-    smtp_email = st.text_input("Your Email", value=os.getenv("SMTP_EMAIL", ""), type="password")
-    smtp_password = st.text_input("Your Email Password/App Password", value=os.getenv("SMTP_PASSWORD", ""), type="password", help="For Gmail: Use App Password, not your regular password!")
+    
+    # SMTP inputs that save to session state
+    smtp_server_input = st.text_input("SMTP Server", value=st.session_state['smtp_config']['server'], help="For Gmail: smtp.gmail.com")
+    smtp_port_input = st.number_input("SMTP Port", value=st.session_state['smtp_config']['port'], help="For Gmail: 587")
+    smtp_email_input = st.text_input("Your Email", value=st.session_state['smtp_config']['email'], type="password")
+    smtp_password_input = st.text_input("Your Email Password/App Password", value=st.session_state['smtp_config']['password'], type="password", help="For Gmail: Use App Password, not your regular password!")
+    
+    # Save to session state when changed
+    st.session_state['smtp_config']['server'] = smtp_server_input
+    st.session_state['smtp_config']['port'] = int(smtp_port_input)
+    st.session_state['smtp_config']['email'] = smtp_email_input
+    st.session_state['smtp_config']['password'] = smtp_password_input
     
     # Test SMTP Connection
     if st.button("🧪 Test SMTP Connection"):
-        if smtp_email and smtp_password:
+        if smtp_email_input and smtp_password_input:
             with st.spinner("Testing connection..."):
                 try:
                     import smtplib
-                    server = smtplib.SMTP(smtp_server, int(smtp_port), timeout=10)
+                    server = smtplib.SMTP(smtp_server_input, int(smtp_port_input), timeout=10)
                     server.starttls()
-                    server.login(smtp_email, smtp_password)
+                    server.login(smtp_email_input, smtp_password_input)
                     server.quit()
                     st.success("✅ SMTP connection successful!")
                 except Exception as e:
@@ -55,6 +63,15 @@ Website Speed & Core Web Vitals Optimization: Fix slow sites that lose Google ra
         help="Enter each service on a new line. Format: Service Name: Description"
     )
 
+# Get SMTP settings from session state or initialize
+if 'smtp_config' not in st.session_state:
+    st.session_state['smtp_config'] = {
+        'server': os.getenv("SMTP_SERVER", "smtp.gmail.com"),
+        'port': int(os.getenv("SMTP_PORT", "587")),
+        'email': os.getenv("SMTP_EMAIL", ""),
+        'password': os.getenv("SMTP_PASSWORD", "")
+    }
+
 # Main input form
 st.header("🎯 Target Company")
 col1, col2, col3 = st.columns(3)
@@ -69,6 +86,12 @@ with col3:
 if not api_key:
     st.error("⚠️ Please enter your Gemini API Key in the sidebar")
     st.stop()
+
+# Get SMTP config from sidebar inputs (stored in session state)
+smtp_server = st.session_state['smtp_config']['server']
+smtp_port = st.session_state['smtp_config']['port']
+smtp_email = st.session_state['smtp_config']['email']
+smtp_password = st.session_state['smtp_config']['password']
 
 # Email sending function
 def send_email(smtp_server, smtp_port, sender_email, sender_password, recipient_email, subject, body):
@@ -202,9 +225,17 @@ if st.button("🚀 Generate Cold Email", type="primary", disabled=not target_url
                 
                 # Send Email Button
                 if recipient_email and smtp_email and smtp_password:
+                    # Debug info
+                    with st.expander("🔧 Debug SMTP Settings"):
+                        st.write(f"Server: {smtp_server}")
+                        st.write(f"Port: {smtp_port}")
+                        st.write(f"From: {smtp_email}")
+                        st.write(f"To: {recipient_email}")
+                    
                     if st.button("📤 Send Email Now", type="primary"):
                         with st.spinner("Sending email..."):
                             subject = extract_subject(email_result)
+                            st.write(f"Debug: Attempting to send to {recipient_email}")
                             success, message = send_email(
                                 smtp_server, smtp_port, smtp_email, smtp_password,
                                 recipient_email, subject, email_result
