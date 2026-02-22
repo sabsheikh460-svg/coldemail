@@ -24,10 +24,26 @@ with st.sidebar:
     
     st.header("📧 Email Configuration (SMTP)")
     st.markdown("For sending emails directly")
-    smtp_server = st.text_input("SMTP Server", value=os.getenv("SMTP_SERVER", "smtp.gmail.com"))
-    smtp_port = st.number_input("SMTP Port", value=int(os.getenv("SMTP_PORT", "587")))
+    smtp_server = st.text_input("SMTP Server", value=os.getenv("SMTP_SERVER", "smtp.gmail.com"), help="For Gmail: smtp.gmail.com")
+    smtp_port = st.number_input("SMTP Port", value=int(os.getenv("SMTP_PORT", "587")), help="For Gmail: 587")
     smtp_email = st.text_input("Your Email", value=os.getenv("SMTP_EMAIL", ""), type="password")
-    smtp_password = st.text_input("Your Email Password/App Password", value=os.getenv("SMTP_PASSWORD", ""), type="password")
+    smtp_password = st.text_input("Your Email Password/App Password", value=os.getenv("SMTP_PASSWORD", ""), type="password", help="For Gmail: Use App Password, not your regular password!")
+    
+    # Test SMTP Connection
+    if st.button("🧪 Test SMTP Connection"):
+        if smtp_email and smtp_password:
+            with st.spinner("Testing connection..."):
+                try:
+                    import smtplib
+                    server = smtplib.SMTP(smtp_server, int(smtp_port), timeout=10)
+                    server.starttls()
+                    server.login(smtp_email, smtp_password)
+                    server.quit()
+                    st.success("✅ SMTP connection successful!")
+                except Exception as e:
+                    st.error(f"❌ Connection failed: {str(e)}")
+        else:
+            st.warning("⚠️ Enter email and password first")
     
     st.header("🎯 Your Agency Services")
     agency_services = st.text_area(
@@ -58,21 +74,45 @@ if not api_key:
 def send_email(smtp_server, smtp_port, sender_email, sender_password, recipient_email, subject, body):
     """Send email via SMTP"""
     try:
+        # Validate inputs
+        if not all([smtp_server, sender_email, sender_password, recipient_email]):
+            return False, "Missing required fields: SMTP server, sender email, password, or recipient email"
+        
+        # Ensure port is integer
+        port = int(smtp_port)
+        
+        # Create message
         msg = MIMEMultipart()
         msg['From'] = sender_email
         msg['To'] = recipient_email
         msg['Subject'] = subject
         msg.attach(MIMEText(body, 'plain'))
         
-        server = smtplib.SMTP(smtp_server, smtp_port)
+        # Connect and send
+        st.info(f"Connecting to {smtp_server}:{port}...")
+        server = smtplib.SMTP(smtp_server, port, timeout=30)
+        server.set_debuglevel(1)  # Enable debug output
+        
+        st.info("Starting TLS...")
         server.starttls()
+        
+        st.info("Logging in...")
         server.login(sender_email, sender_password)
+        
+        st.info("Sending email...")
         text = msg.as_string()
         server.sendmail(sender_email, recipient_email, text)
         server.quit()
-        return True, "Email sent successfully!"
+        
+        return True, f"Email sent successfully to {recipient_email}!"
+    except smtplib.SMTPAuthenticationError as e:
+        return False, f"Authentication failed. Check your email/password. For Gmail, use App Password, not regular password. Error: {str(e)}"
+    except smtplib.SMTPConnectError as e:
+        return False, f"Could not connect to SMTP server. Check server address and port. Error: {str(e)}"
+    except smtplib.SMTPRecipientsRefused as e:
+        return False, f"Recipient address rejected: {str(e)}"
     except Exception as e:
-        return False, str(e)
+        return False, f"Error: {str(e)}"
 
 # Extract subject from email
 def extract_subject(email_text):
