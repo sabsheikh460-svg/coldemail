@@ -233,64 +233,55 @@ if st.button("🚀 Generate Cold Email", type="primary", disabled=not target_url
                 st.session_state['strategy'] = strategy_result
                 st.session_state['recipient_email'] = recipient_email
                 
-                # Send Email Button
+                # Auto-send email if SMTP is configured
                 if recipient_email and smtp_email and smtp_password:
-                    # Debug info
-                    with st.expander("🔧 Debug SMTP Settings"):
-                        st.write(f"Server: {smtp_server}")
-                        st.write(f"Port: {smtp_port}")
-                        st.write(f"From: {smtp_email}")
-                        st.write(f"To: {recipient_email}")
-                    
-                    if st.button("📤 Send Email Now", type="primary"):
-                        with st.spinner("Sending email..."):
-                            subject = extract_subject(email_result)
-                            st.write(f"Debug: Attempting to send to {recipient_email}")
-                            success, message = send_email(
-                                smtp_server, smtp_port, smtp_email, smtp_password,
-                                recipient_email, subject, email_result
-                            )
-                            if success:
-                                # Store in sent mailbox
-                                if 'sent_emails' not in st.session_state:
-                                    st.session_state['sent_emails'] = []
-                                
-                                email_record = {
-                                    'to': recipient_email,
-                                    'to_name': recipient_name,
-                                    'subject': subject,
-                                    'body': email_result,
-                                    'company_url': target_url,
-                                    'timestamp': st.session_state.get('_timestamp', 'Just now')
-                                }
-                                st.session_state['sent_emails'].insert(0, email_record)
-                                
-                                # Notification Agent
-                                st.balloons()
-                                st.success(f"✅ {message}")
-                                
-                                # Generate notification message
-                                notification_prompt = f"""You are a Notification Agent. Create a friendly, professional confirmation message.
-                                
-                                Email sent to: {recipient_name} at {recipient_email}
-                                Subject: {subject}
-                                Company: {target_url}
-                                
-                                Write a brief, celebratory notification confirming the email was sent successfully.
-                                Include next steps suggestion. Keep it under 3 sentences."""
-                                
-                                try:
-                                    notification = call_gemini(notification_prompt, api_key, model)
-                                    st.info(f"📢 **Notification:** {notification}")
-                                except:
-                                    st.info(f"📧 Email sent to **{recipient_name}** at **{recipient_email}** successfully!")
-                                
-                            else:
-                                st.error(f"❌ Failed to send: {message}")
+                    with st.spinner("📤 Auto-sending email..."):
+                        subject = extract_subject(email_result)
+                        success, message = send_email(
+                            smtp_server, smtp_port, smtp_email, smtp_password,
+                            recipient_email, subject, email_result
+                        )
+                        if success:
+                            # Store in sent mailbox
+                            if 'sent_emails' not in st.session_state:
+                                st.session_state['sent_emails'] = []
+                            
+                            email_record = {
+                                'to': recipient_email,
+                                'to_name': recipient_name,
+                                'subject': subject,
+                                'body': email_result,
+                                'company_url': target_url,
+                                'timestamp': 'Just now'
+                            }
+                            st.session_state['sent_emails'].insert(0, email_record)
+                            
+                            # Notification Agent
+                            st.balloons()
+                            st.success(f"✅ {message}")
+                            
+                            # Generate notification message
+                            notification_prompt = f"""You are a Notification Agent. Create a friendly, professional confirmation message.
+                            
+                            Email sent to: {recipient_name} at {recipient_email}
+                            Subject: {subject}
+                            Company: {target_url}
+                            
+                            Write a brief, celebratory notification confirming the email was sent successfully.
+                            Include next steps suggestion. Keep it under 3 sentences."""
+                            
+                            try:
+                                notification = call_gemini(notification_prompt, api_key, model)
+                                st.info(f"📢 **Notification:** {notification}")
+                            except:
+                                st.info(f"📧 Email sent to **{recipient_name}** at **{recipient_email}** successfully!")
+                            
+                        else:
+                            st.error(f"❌ Failed to send: {message}")
                 elif not recipient_email:
-                    st.info("💡 Enter recipient email to enable sending")
+                    st.info("💡 Enter recipient email to enable auto-send")
                 elif not smtp_email or not smtp_password:
-                    st.info("💡 Configure SMTP settings in sidebar to send emails")
+                    st.info("💡 Configure SMTP settings in sidebar to enable auto-send")
                 
             except Exception as e:
                 error_msg = str(e)
