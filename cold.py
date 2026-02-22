@@ -10,6 +10,15 @@ from email.mime.multipart import MIMEMultipart
 # Load environment variables
 load_dotenv()
 
+# Initialize session state BEFORE anything else
+if 'smtp_config' not in st.session_state:
+    st.session_state['smtp_config'] = {
+        'server': os.getenv("SMTP_SERVER", "smtp.gmail.com"),
+        'port': int(os.getenv("SMTP_PORT", "587")),
+        'email': os.getenv("SMTP_EMAIL", ""),
+        'password': os.getenv("SMTP_PASSWORD", "")
+    }
+
 # Page config
 st.set_page_config(page_title="Cold Email Agent", page_icon="📧", layout="wide")
 
@@ -62,15 +71,6 @@ Website Speed & Core Web Vitals Optimization: Fix slow sites that lose Google ra
         height=150,
         help="Enter each service on a new line. Format: Service Name: Description"
     )
-
-# Get SMTP settings from session state or initialize
-if 'smtp_config' not in st.session_state:
-    st.session_state['smtp_config'] = {
-        'server': os.getenv("SMTP_SERVER", "smtp.gmail.com"),
-        'port': int(os.getenv("SMTP_PORT", "587")),
-        'email': os.getenv("SMTP_EMAIL", ""),
-        'password': os.getenv("SMTP_PASSWORD", "")
-    }
 
 # Main input form
 st.header("🎯 Target Company")
